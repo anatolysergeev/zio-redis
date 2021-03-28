@@ -464,7 +464,9 @@ object OutputSpec extends BaseSpec {
               )
             )
           )
-          Task(XReadOutput.unsafeDecode(input)).map(
+          Task(
+            KeyValueOutput(ArbitraryOutput[String](), StreamArbitraryOutput[String, String, String]).unsafeDecode(input)
+          ).map(
             assert(_)(
               equalTo(
                 Map(
@@ -489,7 +491,9 @@ object OutputSpec extends BaseSpec {
               )
             )
           )
-          Task(XReadOutput.unsafeDecode(input)).either.map(assert(_)(isLeft(isSubtype[ProtocolError](anything))))
+          Task(
+            KeyValueOutput(ArbitraryOutput[String](), StreamArbitraryOutput[String, String, String]).unsafeDecode(input)
+          ).either.map(assert(_)(isLeft(isSubtype[ProtocolError](anything))))
         },
         testM("error when message doesn't have an ID") {
           val input = RespValue.array(
@@ -505,7 +509,9 @@ object OutputSpec extends BaseSpec {
               )
             )
           )
-          Task(XReadOutput.unsafeDecode(input)).either.map(assert(_)(isLeft(isSubtype[ProtocolError](anything))))
+          Task(
+            KeyValueOutput(ArbitraryOutput[String](), StreamArbitraryOutput[String, String, String]).unsafeDecode(input)
+          ).either.map(assert(_)(isLeft(isSubtype[ProtocolError](anything))))
         },
         testM("error when stream doesn't have an ID") {
           val input = RespValue.array(
@@ -521,7 +527,9 @@ object OutputSpec extends BaseSpec {
               )
             )
           )
-          Task(XReadOutput.unsafeDecode(input)).either.map(assert(_)(isLeft(isSubtype[ProtocolError](anything))))
+          Task(
+            KeyValueOutput(ArbitraryOutput[String](), StreamArbitraryOutput[String, String, String]).unsafeDecode(input)
+          ).either.map(assert(_)(isLeft(isSubtype[ProtocolError](anything))))
         },
         suite("xInfoStream")(
           testM("extract valid value with first and last entry") {
@@ -554,7 +562,7 @@ object OutputSpec extends BaseSpec {
               )
             )
 
-            assertM(Task(StreamInfoOutput.unsafeDecode(resp)))(
+            assertM(Task(StreamInfoOutput[String, String, String].unsafeDecode(resp)))(
               equalTo(
                 StreamInfo(
                   1,
@@ -582,8 +590,8 @@ object OutputSpec extends BaseSpec {
               RespValue.bulkString("0-0")
             )
 
-            assertM(Task(StreamInfoOutput.unsafeDecode(resp)))(
-              equalTo(StreamInfo(1, 2, 3, 1, "0-0", None, None))
+            assertM(Task(StreamInfoOutput[String, String, String].unsafeDecode(resp)))(
+              equalTo(StreamInfo[String, String, String](1, 2, 3, 1, "0-0", None, None))
             )
           }
         ),
@@ -693,7 +701,7 @@ object OutputSpec extends BaseSpec {
               )
             )
 
-            assertM(Task(StreamInfoFullOutput.unsafeDecode(resp)))(
+            assertM(Task(StreamInfoFullOutput[String, String, String].unsafeDecode(resp)))(
               equalTo(
                 StreamInfoWithFull.FullStreamInfo(
                   1,
@@ -717,9 +725,9 @@ object OutputSpec extends BaseSpec {
               RespValue.bulkString("last-generated-id"),
               RespValue.bulkString("0-0")
             )
-            assertM(Task(StreamInfoFullOutput.unsafeDecode(resp)))(
+            assertM(Task(StreamInfoFullOutput[String, String, String].unsafeDecode(resp)))(
               equalTo(
-                StreamInfoWithFull.FullStreamInfo(1, 2, 3, "0-0", Chunk.empty, Chunk.empty)
+                StreamInfoWithFull.FullStreamInfo[String, String, String](1, 2, 3, "0-0", Chunk.empty, Chunk.empty)
               )
             )
           },
@@ -801,7 +809,7 @@ object OutputSpec extends BaseSpec {
               )
             )
 
-            assertM(Task(StreamInfoFullOutput.unsafeDecode(resp)))(
+            assertM(Task(StreamInfoFullOutput[String, String, String].unsafeDecode(resp)))(
               equalTo(
                 StreamInfoWithFull.FullStreamInfo(
                   1,

@@ -282,14 +282,18 @@ object Input {
       Chunk(encodeString("RETRYCOUNT"), encodeString(data.toString))
   }
 
-  case object XGroupCreateInput extends Input[XGroupCommand.Create] {
-    def encode(data: XGroupCommand.Create)(implicit codec: Codec): Chunk[RespValue.BulkString] = {
+  final case class XGroupCreateInput[K, G, I]()(implicit
+    keySchema: Schema[K],
+    groupSchema: Schema[G],
+    idSchema: Schema[I]
+  ) extends Input[XGroupCommand.Create[K, G, I]] {
+    def encode(data: XGroupCommand.Create[K, G, I])(implicit codec: Codec): Chunk[RespValue.BulkString] = {
       val chunk =
         Chunk(
           encodeString("CREATE"),
-          encodeString(data.key),
-          encodeString(data.group),
-          encodeString(data.id)
+          encodeBytes(codec.encode(keySchema)(data.key)),
+          encodeBytes(codec.encode(groupSchema)(data.group)),
+          encodeBytes(codec.encode(idSchema)(data.id))
         )
 
       if (data.mkStream)
@@ -299,53 +303,89 @@ object Input {
     }
   }
 
-  case object XGroupSetIdInput extends Input[XGroupCommand.SetId] {
-    def encode(data: XGroupCommand.SetId)(implicit codec: Codec): Chunk[RespValue.BulkString] =
-      Chunk(encodeString("SETID"), encodeString(data.key), encodeString(data.group), encodeString(data.id))
-  }
-
-  case object XGroupDestroyInput extends Input[XGroupCommand.Destroy] {
-    def encode(data: XGroupCommand.Destroy)(implicit codec: Codec): Chunk[RespValue.BulkString] =
-      Chunk(encodeString("DESTROY"), encodeString(data.key), encodeString(data.group))
-  }
-
-  case object XGroupCreateConsumerInput extends Input[XGroupCommand.CreateConsumer] {
-    def encode(data: XGroupCommand.CreateConsumer)(implicit codec: Codec): Chunk[RespValue.BulkString] =
+  final case class XGroupSetIdInput[K, G, I]()(implicit
+    keySchema: Schema[K],
+    groupSchema: Schema[G],
+    idSchema: Schema[I]
+  ) extends Input[XGroupCommand.SetId[K, G, I]] {
+    def encode(data: XGroupCommand.SetId[K, G, I])(implicit codec: Codec): Chunk[RespValue.BulkString] =
       Chunk(
-        encodeString("CREATECONSUMER"),
-        encodeString(data.key),
-        encodeString(data.group),
-        encodeString(data.consumer)
+        encodeString("SETID"),
+        encodeBytes(codec.encode(keySchema)(data.key)),
+        encodeBytes(codec.encode(groupSchema)(data.group)),
+        encodeBytes(codec.encode(idSchema)(data.id))
       )
   }
 
-  case object XGroupDelConsumerInput extends Input[XGroupCommand.DelConsumer] {
-    def encode(data: XGroupCommand.DelConsumer)(implicit codec: Codec): Chunk[RespValue.BulkString] =
-      Chunk(encodeString("DELCONSUMER"), encodeString(data.key), encodeString(data.group), encodeString(data.consumer))
+  final case class XGroupDestroyInput[K, G]()(implicit keySchema: Schema[K], groupSchema: Schema[G])
+      extends Input[XGroupCommand.Destroy[K, G]] {
+    def encode(data: XGroupCommand.Destroy[K, G])(implicit codec: Codec): Chunk[RespValue.BulkString] =
+      Chunk(
+        encodeString("DESTROY"),
+        encodeBytes(codec.encode(keySchema)(data.key)),
+        encodeBytes(codec.encode(groupSchema)(data.group))
+      )
   }
 
-  case object XInfoStreamInput extends Input[XInfoCommand.Stream] {
-    def encode(data: XInfoCommand.Stream)(implicit codec: Codec): Chunk[RespValue.BulkString] =
-      data.full.fold(Chunk(encodeString("STREAM"), encodeString(data.key))) { f =>
-        f.count.fold(Chunk(encodeString("STREAM"), encodeString(data.key), encodeString("FULL"))) { c =>
+  final case class XGroupCreateConsumerInput[K, G, C]()(implicit
+    keySchema: Schema[K],
+    groupSchema: Schema[G],
+    consumerSchema: Schema[C]
+  ) extends Input[XGroupCommand.CreateConsumer[K, G, C]] {
+    def encode(data: XGroupCommand.CreateConsumer[K, G, C])(implicit codec: Codec): Chunk[RespValue.BulkString] =
+      Chunk(
+        encodeString("CREATECONSUMER"),
+        encodeBytes(codec.encode(keySchema)(data.key)),
+        encodeBytes(codec.encode(groupSchema)(data.group)),
+        encodeBytes(codec.encode(consumerSchema)(data.consumer))
+      )
+  }
+
+  final case class XGroupDelConsumerInput[K, G, C]()(implicit
+    keySchema: Schema[K],
+    groupSchema: Schema[G],
+    consumerSchema: Schema[C]
+  ) extends Input[XGroupCommand.DelConsumer[K, G, C]] {
+    def encode(data: XGroupCommand.DelConsumer[K, G, C])(implicit codec: Codec): Chunk[RespValue.BulkString] =
+      Chunk(
+        encodeString("DELCONSUMER"),
+        encodeBytes(codec.encode(keySchema)(data.key)),
+        encodeBytes(codec.encode(groupSchema)(data.group)),
+        encodeBytes(codec.encode(consumerSchema)(data.consumer))
+      )
+  }
+
+  final case class XInfoStreamInput[K]()(implicit schema: Schema[K]) extends Input[XInfoCommand.Stream[K]] {
+    def encode(data: XInfoCommand.Stream[K])(implicit codec: Codec): Chunk[RespValue.BulkString] = {
+      val encodedKey = encodeBytes(codec.encode(schema)(data.key))
+      data.full.fold(Chunk(encodeString("STREAM"), encodedKey)) { f =>
+        f.count.fold(Chunk(encodeString("STREAM"), encodedKey, encodeString("FULL"))) { c =>
           Chunk(
             encodeString("STREAM"),
-            encodeString(data.key),
+            encodedKey,
             encodeString("FULL"),
             encodeString("COUNT"),
             encodeString(c.toString)
           )
         }
       }
-  }
-  case object XInfoGroupsInput extends Input[XInfoCommand.Groups] {
-    def encode(data: XInfoCommand.Groups)(implicit codec: Codec): Chunk[RespValue.BulkString] =
-      Chunk(encodeString("GROUPS"), encodeString(data.key))
+    }
   }
 
-  case object XInfoConsumersInput extends Input[XInfoCommand.Consumers] {
-    def encode(data: XInfoCommand.Consumers)(implicit codec: Codec): Chunk[RespValue.BulkString] =
-      Chunk(encodeString("CONSUMERS"), encodeString(data.key), encodeString(data.group))
+  final case class XInfoGroupsInput[K]()(implicit schema: Schema[K]) extends Input[XInfoCommand.Groups[K]] {
+    def encode(data: XInfoCommand.Groups[K])(implicit codec: Codec): Chunk[RespValue.BulkString] = {
+      val encodedKey = encodeBytes(codec.encode(schema)(data.key))
+      Chunk(encodeString("GROUPS"), encodedKey)
+    }
+  }
+
+  final case class XInfoConsumersInput[K, G]()(implicit keySchema: Schema[K], groupSchema: Schema[G])
+      extends Input[XInfoCommand.Consumers[K, G]] {
+    def encode(data: XInfoCommand.Consumers[K, G])(implicit codec: Codec): Chunk[RespValue.BulkString] = {
+      val encodedKey   = encodeBytes(codec.encode(keySchema)(data.key))
+      val encodedGroup = encodeBytes(codec.encode(groupSchema)(data.group))
+      Chunk(encodeString("CONSUMERS"), encodedKey, encodedGroup)
+    }
   }
 
   case object BlockInput extends Input[Duration] {
@@ -364,9 +404,25 @@ object Input {
     }
   }
 
-  case object GroupInput extends Input[Group] {
-    def encode(data: Group)(implicit codec: Codec): Chunk[RespValue.BulkString] =
-      Chunk(encodeString("GROUP"), encodeString(data.group), encodeString(data.consumer))
+  final case class StreamsArbitraryInput[K, V]()(implicit keySchema: Schema[K], valueSchema: Schema[V])
+      extends Input[((K, V), Chunk[(K, V)])] {
+    private[redis] def encode(data: ((K, V), Chunk[(K, V)]))(implicit codec: Codec): Chunk[RespValue.BulkString] = {
+      val (keys, ids) = (data._1 +: data._2).map { case (key, value) =>
+        (encodeBytes(codec.encode(keySchema)(key)), encodeBytes(codec.encode(valueSchema)(value)))
+      }.unzip
+
+      Chunk.single(encodeString("STREAMS")) ++ keys ++ ids
+    }
+  }
+
+  final case class GroupInput[SG, SC]()(implicit groupSchema: Schema[SG], consumerSchema: Schema[SC])
+      extends Input[Group[SG, SC]] {
+    def encode(data: Group[SG, SC])(implicit codec: Codec): Chunk[RespValue.BulkString] =
+      Chunk(
+        encodeString("GROUP"),
+        encodeBytes(codec.encode(groupSchema)(data.group)),
+        encodeBytes(codec.encode(consumerSchema)(data.consumer))
+      )
   }
 
   case object NoAckInput extends Input[NoAck] {

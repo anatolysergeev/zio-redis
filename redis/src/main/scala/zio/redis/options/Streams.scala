@@ -27,15 +27,6 @@ trait Streams {
     sealed case class DelConsumer[SK, SG, SC](key: SK, group: SG, consumer: SC)       extends XGroupCommand
   }
 
-  sealed trait XInfoCommand
-
-  object XInfoCommand {
-    sealed case class Stream[K](key: K, full: Option[Full] = None) extends XInfoCommand
-    sealed case class Full(count: Option[Long])
-    sealed case class Groups[K](key: K)                 extends XInfoCommand
-    sealed case class Consumers[K, G](key: K, group: G) extends XInfoCommand
-  }
-
   case object MkStream {
     private[redis] def stringify = "MKSTREAM"
   }

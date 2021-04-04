@@ -1,7 +1,7 @@
 package zio.redis.api
 
 import zio.duration._
-import zio.redis.Input.{ XInfoConsumersInput, _ }
+import zio.redis.Input._
 import zio.redis.Output.{ StreamGroupsInfoOutput, _ }
 import zio.redis._
 import zio.schema.Schema
@@ -71,8 +71,8 @@ trait Streams {
   final def xInfoStream[SK: Schema, RI: Schema, RK: Schema, RV: Schema](
     key: SK
   ): ZIO[RedisExecutor, RedisError, StreamInfo[RI, RK, RV]] = {
-    val command = RedisCommand(XInfo, XInfoStreamInput[SK], StreamInfoOutput[RI, RK, RV])
-    command.run(XInfoCommand.Stream(key))
+    val command = RedisCommand(XInfoStream, ArbitraryInput[SK](), StreamInfoOutput[RI, RK, RV]())
+    command.run(key)
   }
 
   /**
@@ -84,8 +84,12 @@ trait Streams {
   final def xInfoStreamFull[SK: Schema, RI: Schema, RK: Schema, RV: Schema](
     key: SK
   ): ZIO[RedisExecutor, RedisError, StreamInfoWithFull.FullStreamInfo[RI, RK, RV]] = {
-    val command = RedisCommand(XInfo, XInfoStreamInput[SK](), StreamInfoFullOutput[RI, RK, RV]())
-    command.run(XInfoCommand.Stream(key, Some(XInfoCommand.Full(None))))
+    val command = RedisCommand(
+      XInfoStream,
+      Tuple2(ArbitraryInput[SK](), ArbitraryInput[String]()),
+      StreamInfoFullOutput[RI, RK, RV]()
+    )
+    command.run((key, "FULL"))
   }
 
   /**
@@ -99,8 +103,12 @@ trait Streams {
     key: SK,
     count: Long
   ): ZIO[RedisExecutor, RedisError, StreamInfoWithFull.FullStreamInfo[RI, RK, RV]] = {
-    val command = RedisCommand(XInfo, XInfoStreamInput[SK](), StreamInfoFullOutput[RI, RK, RV])
-    command.run(XInfoCommand.Stream(key, Some(XInfoCommand.Full(Some(count)))))
+    val command = RedisCommand(
+      XInfoStream,
+      Tuple3(ArbitraryInput[SK](), ArbitraryInput[String](), CountInput),
+      StreamInfoFullOutput[RI, RK, RV]()
+    )
+    command.run((key, "FULL", Count(count)))
   }
 
   /**
@@ -110,8 +118,8 @@ trait Streams {
    * @return List of consumer groups associated with the stream stored at the specified key.
    */
   final def xInfoGroups[SK: Schema](key: SK): ZIO[RedisExecutor, RedisError, Chunk[StreamGroupsInfo]] = {
-    val command = RedisCommand(XInfo, XInfoGroupsInput[SK](), StreamGroupsInfoOutput)
-    command.run(XInfoCommand.Groups(key))
+    val command = RedisCommand(XInfoGroups, ArbitraryInput[SK](), StreamGroupsInfoOutput)
+    command.run(key)
   }
 
   /**
@@ -125,8 +133,9 @@ trait Streams {
     key: SK,
     group: SG
   ): ZIO[RedisExecutor, RedisError, Chunk[StreamConsumersInfo]] = {
-    val command = RedisCommand(XInfo, XInfoConsumersInput[SK, SG](), StreamConsumersInfoOutput)
-    command.run(XInfoCommand.Consumers(key, group))
+    val command =
+      RedisCommand(XInfoConsumers, Tuple2(ArbitraryInput[SK](), ArbitraryInput[SG]()), StreamConsumersInfoOutput)
+    command.run((key, group))
   }
 
   /**
@@ -200,7 +209,7 @@ trait Streams {
         OptionalInput(RetryCountInput),
         OptionalInput(WithForceInput)
       ),
-      StreamArbitraryOutput[I, RK, RV]
+      StreamOutput[I, RK, RV]()
     )
     val forceOpt = if (force) Some(WithForce) else None
     command.run((key, group, consumer, minIdleTime, (id, ids.toList), idle, time, retryCount, forceOpt))
@@ -278,7 +287,7 @@ trait Streams {
     id: I,
     mkStream: Boolean = false
   ): ZIO[RedisExecutor, RedisError, Unit] = {
-    val command = RedisCommand(XGroup, XGroupCreateInput[SK, SG, I], UnitOutput)
+    val command = RedisCommand(XGroup, XGroupCreateInput[SK, SG, I](), UnitOutput)
     command.run(Create(key, group, id, mkStream))
   }
 
@@ -294,7 +303,7 @@ trait Streams {
     group: SG,
     id: I
   ): ZIO[RedisExecutor, RedisError, Unit] = {
-    val command = RedisCommand(XGroup, XGroupSetIdInput[SK, SG, I], UnitOutput)
+    val command = RedisCommand(XGroup, XGroupSetIdInput[SK, SG, I](), UnitOutput)
     command.run(SetId(key, group, id))
   }
 
@@ -307,7 +316,7 @@ trait Streams {
    */
   final def xGroupDestroy[SK: Schema, SG: Schema](key: SK, group: SG): ZIO[RedisExecutor, RedisError, Boolean] = {
     val command =
-      RedisCommand(XGroup, XGroupDestroyInput[SK, SG], BoolOutput)
+      RedisCommand(XGroup, XGroupDestroyInput[SK, SG](), BoolOutput)
     command.run(Destroy(key, group))
   }
 
@@ -323,7 +332,7 @@ trait Streams {
     group: SG,
     consumer: SC
   ): ZIO[RedisExecutor, RedisError, Unit] = {
-    val command = RedisCommand(XGroup, XGroupCreateConsumerInput[SK, SG, SC], UnitOutput)
+    val command = RedisCommand(XGroup, XGroupCreateConsumerInput[SK, SG, SC](), UnitOutput)
     command.run(CreateConsumer(key, group, consumer))
   }
 
@@ -340,7 +349,7 @@ trait Streams {
     group: SG,
     consumer: SC
   ): ZIO[RedisExecutor, RedisError, Long] = {
-    val command = RedisCommand(XGroup, XGroupDelConsumerInput[SK, SG, SC], LongOutput)
+    val command = RedisCommand(XGroup, XGroupDelConsumerInput[SK, SG, SC](), LongOutput)
     command.run(DelConsumer(key, group, consumer))
   }
 
@@ -445,7 +454,7 @@ trait Streams {
     val command = RedisCommand(
       XRange,
       Tuple4(ArbitraryInput[SK](), ArbitraryInput[I](), ArbitraryInput[I](), OptionalInput(CountInput)),
-      StreamArbitraryOutput[I, RK, RV]()
+      StreamOutput[I, RK, RV]()
     )
     command.run((key, start, end, None))
   }
@@ -468,7 +477,7 @@ trait Streams {
     val command = RedisCommand(
       XRange,
       Tuple4(ArbitraryInput[SK](), ArbitraryInput[I](), ArbitraryInput[I](), OptionalInput(CountInput)),
-      StreamArbitraryOutput[I, RK, RV]()
+      StreamOutput[I, RK, RV]()
     )
     command.run((key, start, end, Some(Count(count))))
   }
@@ -491,8 +500,8 @@ trait Streams {
   ): ZIO[RedisExecutor, RedisError, Map[SK, Map[I, Map[RK, RV]]]] = {
     val command = RedisCommand(
       XRead,
-      Tuple3(OptionalInput(CountInput), OptionalInput(BlockInput), StreamsArbitraryInput[SK, I]()),
-      KeyValueOutput(ArbitraryOutput[SK](), StreamArbitraryOutput[I, RK, RV])
+      Tuple3(OptionalInput(CountInput), OptionalInput(BlockInput), StreamsInput[SK, I]()),
+      KeyValueTwoOutput(ArbitraryOutput[SK](), StreamOutput[I, RK, RV]())
     )
     command.run((count.map(Count), block, (stream, Chunk.fromIterable(streams))))
   }
@@ -521,17 +530,18 @@ trait Streams {
   ): ZIO[RedisExecutor, RedisError, Map[SK, Map[I, Map[RK, RV]]]] = {
     val command = RedisCommand(
       XReadGroup,
-      Tuple5(
-        GroupInput[SG, SC],
+      Tuple6(
+        ArbitraryInput[SG](),
+        ArbitraryInput[SC](),
         OptionalInput(CountInput),
         OptionalInput(BlockInput),
         OptionalInput(NoAckInput),
-        StreamsArbitraryInput[SK, I]()
+        StreamsInput[SK, I]()
       ),
-      KeyValueOutput(ArbitraryOutput[SK](), StreamArbitraryOutput[I, RK, RV])
+      KeyValueTwoOutput(ArbitraryOutput[SK](), StreamOutput[I, RK, RV]())
     )
     val noAckOpt = if (noAck) Some(NoAck) else None
-    command.run((Group(group, consumer), count.map(Count), block, noAckOpt, (stream, Chunk.fromIterable(streams))))
+    command.run((group, consumer, count.map(Count), block, noAckOpt, (stream, Chunk.fromIterable(streams))))
   }
 
   /**
@@ -550,7 +560,7 @@ trait Streams {
     val command = RedisCommand(
       XRevRange,
       Tuple4(ArbitraryInput[SK](), ArbitraryInput[I](), ArbitraryInput[I](), OptionalInput(CountInput)),
-      StreamArbitraryOutput[I, RK, RV]
+      StreamOutput[I, RK, RV]()
     )
     command.run((key, end, start, None))
   }
@@ -573,7 +583,7 @@ trait Streams {
     val command = RedisCommand(
       XRevRange,
       Tuple4(ArbitraryInput[SK](), ArbitraryInput[I](), ArbitraryInput[I](), OptionalInput(CountInput)),
-      StreamArbitraryOutput[I, RK, RV]
+      StreamOutput[I, RK, RV]()
     )
     command.run((key, end, start, Some(Count(count))))
   }
@@ -597,17 +607,19 @@ trait Streams {
 }
 
 private object Streams {
-  final val XAck       = "XACK"
-  final val XAdd       = "XADD"
-  final val XClaim     = "XCLAIM"
-  final val XDel       = "XDEL"
-  final val XGroup     = "XGROUP"
-  final val XInfo      = "XINFO"
-  final val XLen       = "XLEN"
-  final val XPending   = "XPENDING"
-  final val XRange     = "XRANGE"
-  final val XRead      = "XREAD"
-  final val XReadGroup = "XREADGROUP"
-  final val XRevRange  = "XREVRANGE"
-  final val XTrim      = "XTRIM"
+  final val XAck           = "XACK"
+  final val XAdd           = "XADD"
+  final val XClaim         = "XCLAIM"
+  final val XDel           = "XDEL"
+  final val XGroup         = "XGROUP"
+  final val XInfoStream    = "XINFO STREAM"
+  final val XInfoGroups    = "XINFO GROUPS"
+  final val XInfoConsumers = "XINFO CONSUMERS"
+  final val XLen           = "XLEN"
+  final val XPending       = "XPENDING"
+  final val XRange         = "XRANGE"
+  final val XRead          = "XREAD"
+  final val XReadGroup     = "XREADGROUP GROUP"
+  final val XRevRange      = "XREVRANGE"
+  final val XTrim          = "XTRIM"
 }

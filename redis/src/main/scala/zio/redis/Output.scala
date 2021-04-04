@@ -269,33 +269,28 @@ object Output {
       }
   }
 
-  case object StreamOutput extends Output[Map[String, Map[String, String]]] {
-    protected def tryDecode(respValue: RespValue)(implicit codec: Codec): Map[String, Map[String, String]] =
+  final case class KeyValueTwoOutput[K, V](outK: Output[K], outV: Output[V]) extends Output[Map[K, V]] {
+    protected def tryDecode(respValue: RespValue)(implicit codec: Codec): Map[K, V] =
       respValue match {
-        case RespValue.NullArray       => Map.empty[String, Map[String, String]]
-        case RespValue.Array(entities) => extractNestedMap(entities)
-        case other                     => throw ProtocolError(s"$other isn't an array")
+        case RespValue.NullArray => Map.empty[K, V]
+        case RespValue.Array(entities) =>
+          entities.map {
+            case RespValue.Array(Seq(key @ RespValue.BulkString(_), value)) =>
+              outK.unsafeDecode(key) -> outV.unsafeDecode(value)
+            case other =>
+              throw ProtocolError(s"$other isn't a valid array")
+          }.toMap
+        case other => throw ProtocolError(s"$other isn't an array")
       }
   }
 
-  private def extractNestedMap(entities: Chunk[RespValue])(implicit codec: Codec): Map[String, Map[String, String]] = {
-    val output = collection.mutable.Map.empty[String, Map[String, String]]
-    entities.foreach {
-      case RespValue.Array(Seq(id @ RespValue.BulkString(_), value)) =>
-        output += (id.asString -> KeyValueOutput(MultiStringOutput, MultiStringOutput).unsafeDecode(value))
-      case other =>
-        throw ProtocolError(s"$other isn't a valid array")
-    }
-    output.toMap
-  }
-
-  final case class StreamArbitraryOutput[I, K, V]()(implicit
+  final case class StreamOutput[I, K, V]()(implicit
     idSchema: Schema[I],
     keySchema: Schema[K],
     valueSchema: Schema[V]
   ) extends Output[Map[I, Map[K, V]]] {
     protected def tryDecode(respValue: RespValue)(implicit codec: Codec): Map[I, Map[K, V]] =
-      KeyValueOutput(ArbitraryOutput[I](), KeyValueOutput(ArbitraryOutput[K](), ArbitraryOutput[V]()))
+      KeyValueTwoOutput(ArbitraryOutput[I](), KeyValueOutput(ArbitraryOutput[K](), ArbitraryOutput[V]()))
         .unsafeDecode(respValue)
   }
 

@@ -924,7 +924,7 @@ object InputSpec extends BaseSpec {
       suite("XGroupCreate")(
         testM("without mkStream") {
           Task(
-            XGroupCreateInput[String, String, String].encode(
+            XGroupCreateInput[String, String, String]().encode(
               XGroupCommand.Create("key", "group", "id", mkStream = false)
             )
           )
@@ -932,7 +932,7 @@ object InputSpec extends BaseSpec {
         },
         testM("with mkStream") {
           Task(
-            XGroupCreateInput[String, String, String].encode(
+            XGroupCreateInput[String, String, String]().encode(
               XGroupCommand.Create("key", "group", "id", mkStream = true)
             )
           )
@@ -941,20 +941,20 @@ object InputSpec extends BaseSpec {
       ),
       suite("XGroupSetId")(
         testM("valid value") {
-          Task(XGroupSetIdInput[String, String, String].encode(XGroupCommand.SetId("key", "group", "id")))
+          Task(XGroupSetIdInput[String, String, String]().encode(XGroupCommand.SetId("key", "group", "id")))
             .map(assert(_)(equalTo(respArgs("SETID", "key", "group", "id"))))
         }
       ),
       suite("XGroupDestroy")(
         testM("valid value") {
-          Task(XGroupDestroyInput[String, String].encode(XGroupCommand.Destroy("key", "group")))
+          Task(XGroupDestroyInput[String, String]().encode(XGroupCommand.Destroy("key", "group")))
             .map(assert(_)(equalTo(respArgs("DESTROY", "key", "group"))))
         }
       ),
       suite("XGroupCreateConsumer")(
         testM("valid value") {
           Task(
-            XGroupCreateConsumerInput[String, String, String].encode(
+            XGroupCreateConsumerInput[String, String, String]().encode(
               XGroupCommand.CreateConsumer("key", "group", "consumer")
             )
           )
@@ -964,7 +964,9 @@ object InputSpec extends BaseSpec {
       suite("XGroupDelConsumer")(
         testM("valid value") {
           Task(
-            XGroupDelConsumerInput[String, String, String].encode(XGroupCommand.DelConsumer("key", "group", "consumer"))
+            XGroupDelConsumerInput[String, String, String]().encode(
+              XGroupCommand.DelConsumer("key", "group", "consumer")
+            )
           )
             .map(assert(_)(equalTo(respArgs("DELCONSUMER", "key", "group", "consumer"))))
         }
@@ -985,46 +987,12 @@ object InputSpec extends BaseSpec {
       ),
       suite("Streams")(
         testM("with one pair") {
-          Task(StreamsInput.encode(("a" -> "b", Chunk.empty)))
+          Task(StreamsInput[String, String]().encode(("a" -> "b", Chunk.empty)))
             .map(assert(_)(equalTo(respArgs("STREAMS", "a", "b"))))
         },
         testM("with multiple pairs") {
-          Task(StreamsInput.encode(("a" -> "b", Chunk.single("c" -> "d"))))
+          Task(StreamsInput[String, String]().encode(("a" -> "b", Chunk.single("c" -> "d"))))
             .map(assert(_)(equalTo(respArgs("STREAMS", "a", "c", "b", "d"))))
-        }
-      ),
-      suite("XInfoStream")(
-        testM("valid value") {
-          assertM(Task(XInfoStreamInput[String].encode(XInfoCommand.Stream("key"))))(
-            equalTo(respArgs("STREAM", "key"))
-          )
-        }
-      ),
-      suite("XInfoStreamFull")(
-        testM("valid value") {
-          assertM(Task(XInfoStreamInput[String].encode(XInfoCommand.Stream("key", Some(XInfoCommand.Full(Some(10)))))))(
-            equalTo(respArgs("STREAM", "key", "FULL", "COUNT", "10"))
-          )
-        }
-      ),
-      suite("XInfoGroups")(
-        testM("valid value") {
-          assertM(Task(XInfoGroupsInput[String].encode(XInfoCommand.Groups("key"))))(
-            equalTo(respArgs("GROUPS", "key"))
-          )
-        }
-      ),
-      suite("XInfoConsumers")(
-        testM("valid value") {
-          assertM(Task(XInfoConsumersInput[String, String].encode(XInfoCommand.Consumers("key", "group"))))(
-            equalTo(respArgs("CONSUMERS", "key", "group"))
-          )
-        }
-      ),
-      suite("Group")(
-        testM("valid value") {
-          Task(GroupInput[String, String].encode(Group("group", "consumer")))
-            .map(assert(_)(equalTo(respArgs("GROUP", "group", "consumer"))))
         }
       ),
       suite("NoAck")(

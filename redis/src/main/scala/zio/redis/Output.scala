@@ -146,6 +146,14 @@ object Output {
       }
   }
 
+  final case class Tuple2Output[+A, +B](_1: Output[A], _2: Output[B]) extends Output[(A, B)] {
+    protected def tryDecode(respValue: RespValue)(implicit codec: Codec): (A, B) =
+      respValue match {
+        case RespValue.ArrayValues(a: RespValue, b: RespValue) => (_1.tryDecode(a), _2.tryDecode(b))
+        case other                                             => throw ProtocolError(s"$other isn't a tuple2")
+      }
+  }
+
   case object SingleOrMultiStringOutput extends Output[String] {
     protected def tryDecode(respValue: RespValue)(implicit codec: Codec): String =
       respValue match {

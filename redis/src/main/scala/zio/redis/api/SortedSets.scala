@@ -2,7 +2,7 @@ package zio.redis.api
 
 import zio.duration._
 import zio.redis.Input._
-import zio.redis.Output.{ Tuple2Output, _ }
+import zio.redis.Output._
 import zio.redis._
 import zio.schema.Schema
 import zio.{ Chunk, ZIO }
